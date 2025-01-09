@@ -1,14 +1,9 @@
-#include <cstddef>
-#include <cstdlib>
-#include <cstring>
-#include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <termios.h>
 #include <unistd.h>
-#include <pthread.h>
 
 enum userSignal {
   SIGN_FAILURE = -1,
@@ -52,6 +47,31 @@ void *read_port(void *arg_fd) {
     }
   }
   return (void *)signal;
+}
+
+void wait_signal() {
+  struct termios newStdinSettings, oldStdinSettings;
+  tcgetattr(STDIN_FILENO, &oldStdinSettings);
+
+  newStdinSettings = oldStdinSettings;
+  newStdinSettings.c_lflag &= ~(ICANON | ECHO);
+
+  if ((tcsetattr(STDIN_FILENO, TCSANOW, &newStdinSettings)) != 0) {
+    fprintf(stderr, "ERROR! in Setting new STDIN attributes\n");
+    exit(EXIT_FAILURE);
+  }
+
+  // Wait exit signal from stdin
+  while (signal == SIGN_OK) {
+    char ch = getc(stdin);
+    if (ch == 0x1D) // Ctrl + ] to exit
+      signal = SIGN_EXIT;
+  }
+
+  if ((tcsetattr(STDIN_FILENO, TCSANOW, &oldStdinSettings)) != 0) {
+    fprintf(stderr, "ERROR! in Setting old STDIN attributes\n");
+    exit(EXIT_FAILURE);
+  }
 }
 
 int main(int argc, char *argv[]) {
@@ -99,11 +119,7 @@ int main(int argc, char *argv[]) {
   pthread_t thread1;
   pthread_create(&thread1, NULL, read_port, &fd);
 
-  while (signal == SIGN_OK) {
-    char ch = getc(stdin);
-    if (ch == 'q')
-        signal = SIGN_EXIT;
-  }
+  wait_signal();
 
   if ((tcsetattr(fd, TCSANOW, &oldPortSettings)) != 0)
     fprintf(stderr, "ERROR! in restore old termios attributes\n");
