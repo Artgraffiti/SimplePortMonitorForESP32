@@ -2,15 +2,16 @@ CC = g++
 CFLAGS ?= -g -std=c++11
 CFLAGS += -Wall -Werror -Wextra
 
-SRCS = main.cpp
-
 all: monitor
 
-monitor: $(SRCS)
+monitor: monitor.cpp
+	$(CC) $^ -o $@ $(CFLAGS)
+
+monitor_thread: monitor_thread.cpp
 	$(CC) $^ -o $@ $(CFLAGS)
 
 cif:
-	clang-format -i main.cpp
+	clang-format -i monitor.cpp monitor_thread.cpp
 
 clean:
-	rm -rf monitor
+	rm -rf monitor monitor_thread
